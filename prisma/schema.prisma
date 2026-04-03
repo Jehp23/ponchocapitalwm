@@ -84,6 +84,12 @@ enum AuditAction {
   PUBLISH
 }
 
+enum MarketDataProvider {
+  DATA912
+  MANUAL
+  SEEDED
+}
+
 model User {
   id             String      @id @default(cuid())
   email          String      @unique
@@ -155,6 +161,7 @@ model Asset {
   holdings       PortfolioHolding[]
   snapshots      PositionSnapshot[]
   manualUpdates  ManualUpdate[]
+  quotes         AssetQuote[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -305,4 +312,39 @@ model AuditLog {
   createdAt   DateTime    @default(now())
 
   @@index([entityType, entityId, createdAt])
+}
+
+model AssetQuote {
+  id            String             @id @default(cuid())
+  assetId       String
+  provider      MarketDataProvider @default(DATA912)
+  symbol        String
+  currency      String
+  price         Decimal            @db.Decimal(18, 6)
+  bid           Decimal?           @db.Decimal(18, 6)
+  ask           Decimal?           @db.Decimal(18, 6)
+  previousClose Decimal?           @db.Decimal(18, 6)
+  changePct     Decimal?           @db.Decimal(10, 6)
+  asOf          DateTime
+  payload       Json?
+  asset         Asset              @relation(fields: [assetId], references: [id])
+  createdAt     DateTime           @default(now())
+
+  @@unique([assetId, provider, asOf])
+  @@index([assetId, asOf(sort: Desc)])
+  @@index([symbol, asOf(sort: Desc)])
+}
+
+model FxRate {
+  id            String             @id @default(cuid())
+  provider      MarketDataProvider @default(DATA912)
+  baseCurrency  String
+  quoteCurrency String
+  rate          Decimal            @db.Decimal(18, 8)
+  asOf          DateTime
+  payload       Json?
+  createdAt     DateTime           @default(now())
+
+  @@unique([provider, baseCurrency, quoteCurrency, asOf])
+  @@index([baseCurrency, quoteCurrency, asOf(sort: Desc)])
 }

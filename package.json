@@ -13,6 +13,7 @@
     "build": "npm run build --workspace web && npm run build --workspace api",
     "lint": "npm run lint --workspace web && npm run lint --workspace api",
     "typecheck": "npm run typecheck --workspace web && npm run typecheck --workspace api",
+    "market:sync": "npm run market:sync --workspace api",
     "db:generate": "npm run db:generate --workspace api",
     "db:push": "npm run db:push --workspace api",
     "db:migrate": "npm run db:migrate --workspace api",

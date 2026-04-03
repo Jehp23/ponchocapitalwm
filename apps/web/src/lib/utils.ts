@@ -20,16 +20,18 @@ export function formatPercentage(value: number) {
   }).format(value);
 }
 
-export const DISPLAY_FX_RATES: Record<string, number> = {
+export type FxRateMap = Record<string, number>;
+
+export const DISPLAY_FX_RATES: FxRateMap = {
   ARS: 1,
   USD: 1100
 };
 
-export function convertCurrency(value: number, fromCurrency = "ARS", toCurrency = "ARS") {
+export function convertCurrency(value: number, fromCurrency = "ARS", toCurrency = "ARS", fxRates: FxRateMap = DISPLAY_FX_RATES) {
   const from = fromCurrency.toUpperCase();
   const to = toCurrency.toUpperCase();
-  const fromRate = DISPLAY_FX_RATES[from];
-  const toRate = DISPLAY_FX_RATES[to];
+  const fromRate = fxRates[from];
+  const toRate = fxRates[to];
 
   if (!fromRate || !toRate) {
     return value;
@@ -37,4 +39,15 @@ export function convertCurrency(value: number, fromCurrency = "ARS", toCurrency 
 
   const valueInArs = from === "ARS" ? value : value * fromRate;
   return to === "ARS" ? valueInArs : valueInArs / toRate;
+}
+
+export function buildFxRateMap(latestUsdArs?: number) {
+  if (!latestUsdArs || !Number.isFinite(latestUsdArs) || latestUsdArs <= 0) {
+    return DISPLAY_FX_RATES;
+  }
+
+  return {
+    ARS: 1,
+    USD: latestUsdArs
+  } satisfies FxRateMap;
 }

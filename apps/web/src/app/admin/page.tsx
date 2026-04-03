@@ -12,6 +12,8 @@ import { prisma } from "@/lib/prisma";
 import { getAdminOverview } from "@/modules/dashboard/queries";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboardPage() {
   const session = await auth();
   const overview = await getAdminOverview();

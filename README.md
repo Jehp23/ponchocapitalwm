@@ -26,6 +26,7 @@ Hoy funciona:
 - Apertura de portfolio
 - Registro manual de movimientos
 - Visualizacion de cartera en ARS o USD
+- Capa de market data preparada para sincronizar precios reales y dolar desde Data912
 - Base PostgreSQL con Prisma
 - Importador preparado con parser basado en `exceljs`
 
@@ -115,9 +116,12 @@ Usar `.env.example` como referencia.
 Variables esperadas:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ponchocapitalwm?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ponchocapital_wm?schema=public"
 AUTH_SECRET="una-clave-larga-y-random"
 AUTH_TRUST_HOST="true"
+NEXT_PUBLIC_API_URL="http://localhost:4000"
+API_PORT="4000"
+DATA912_BASE_URL="https://data912.com"
 ```
 
 ## Arranque rapido con Docker
@@ -148,6 +152,7 @@ npm run dev:web
 npm run dev:api
 npm run build
 npm run typecheck
+npm run market:sync
 npm run db:generate
 npm run db:push
 npm run db:seed
@@ -184,8 +189,25 @@ Antes de compartir esta version se validaron:
 
 - La app no opera mercado real
 - La operatoria real sigue ocurriendo fuera del sistema
-- La vista `ARS / USD` del cliente es una visualizacion orientativa del MVP
+- La vista `ARS / USD` usa el ultimo USD/ARS guardado en base; si no existe, cae a una referencia local del MVP
+- La integracion Data912 se consume desde backend y se persiste en DB para no depender del endpoint en cada vista
+- Data912, segun su propia documentacion oficial, no es una fuente real-time ni de grado institucional; en este MVP se usa como referencia cacheada
 - El importador Excel ya no usa `xlsx`; fue migrado a `exceljs`
+
+## Sincronizacion de market data
+
+Para actualizar precios de activos y dolar desde Data912:
+
+```bash
+npm run market:sync
+```
+
+Eso guarda en PostgreSQL:
+
+- ultimas cotizaciones por activo (`AssetQuote`)
+- ultimo tipo de cambio USD/ARS y ARS/USD (`FxRate`)
+
+La vista cliente toma esos datos automaticamente cuando existen.
 
 ## Siguientes mejoras sugeridas
 

@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { Sidebar, adminNav } from "@/components/layout/sidebar";
 import { canAccessAdmin } from "@/lib/permissions";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await auth();
 

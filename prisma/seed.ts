@@ -1,7 +1,20 @@
 process.loadEnvFile?.(".env");
 
 import bcrypt from "bcryptjs";
-import { PrismaClient, UserRole, UserStatus, AssetClass, ImportBatchStatus, UpdateOrigin, ManualUpdateType, MovementType, NoteVisibility, AuditAction, PortfolioVisibilityStatus } from "@prisma/client";
+import {
+  PrismaClient,
+  UserRole,
+  UserStatus,
+  AssetClass,
+  ImportBatchStatus,
+  UpdateOrigin,
+  ManualUpdateType,
+  MovementType,
+  NoteVisibility,
+  AuditAction,
+  PortfolioVisibilityStatus,
+  MarketDataProvider
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -100,6 +113,81 @@ async function main() {
       }
     })
   ]);
+
+  const marketAsOf = new Date("2026-04-01T15:30:00.000Z");
+
+  await prisma.fxRate.createMany({
+    data: [
+      {
+        provider: MarketDataProvider.SEEDED,
+        baseCurrency: "USD",
+        quoteCurrency: "ARS",
+        rate: "1100.00000000",
+        asOf: marketAsOf,
+        payload: {
+          source: "seed",
+          label: "USD/ARS reference rate"
+        }
+      },
+      {
+        provider: MarketDataProvider.SEEDED,
+        baseCurrency: "ARS",
+        quoteCurrency: "USD",
+        rate: "0.00090909",
+        asOf: marketAsOf,
+        payload: {
+          source: "seed",
+          label: "ARS/USD inverse reference rate"
+        }
+      }
+    ],
+    skipDuplicates: true
+  });
+
+  await prisma.assetQuote.createMany({
+    data: [
+      {
+        assetId: apple.id,
+        provider: MarketDataProvider.SEEDED,
+        symbol: "AAPL",
+        currency: "USD",
+        price: "214.200000",
+        previousClose: "211.500000",
+        changePct: "1.276596",
+        asOf: marketAsOf,
+        payload: {
+          source: "seed"
+        }
+      },
+      {
+        assetId: treasury.id,
+        provider: MarketDataProvider.SEEDED,
+        symbol: "UST2030",
+        currency: "USD",
+        price: "102.150000",
+        previousClose: "101.900000",
+        changePct: "0.245338",
+        asOf: marketAsOf,
+        payload: {
+          source: "seed"
+        }
+      },
+      {
+        assetId: cash.id,
+        provider: MarketDataProvider.SEEDED,
+        symbol: "USD",
+        currency: "USD",
+        price: "1.000000",
+        previousClose: "1.000000",
+        changePct: "0.000000",
+        asOf: marketAsOf,
+        payload: {
+          source: "seed"
+        }
+      }
+    ],
+    skipDuplicates: true
+  });
 
   const batch = await prisma.importBatch.create({
     data: {

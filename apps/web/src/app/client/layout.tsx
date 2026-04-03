@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { Sidebar, clientNav } from "@/components/layout/sidebar";
 import { canAccessClient } from "@/lib/permissions";
 
+export const dynamic = "force-dynamic";
+
 export default async function ClientLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await auth();
 

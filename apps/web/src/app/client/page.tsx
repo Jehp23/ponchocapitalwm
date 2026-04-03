@@ -7,7 +7,7 @@ import { PortfolioGrowthChart } from "@/components/charts/portfolio-growth-chart
 import { Topbar } from "@/components/layout/topbar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { convertCurrency, formatCurrency, formatPercentage } from "@/lib/utils";
+import { buildFxRateMap, convertCurrency, formatCurrency, formatPercentage } from "@/lib/utils";
 import { getClientOverview } from "@/modules/dashboard/queries";
 import {
   annualizePeriodicReturn,
@@ -18,6 +18,9 @@ import {
   calculatePortfolioTotalValue,
   calculateSimpleReturn
 } from "@/modules/finance/calculate";
+import { getLatestAssetQuotes, getLatestUsdArsRate } from "@/modules/market-data/queries";
+
+export const dynamic = "force-dynamic";
 
 export default async function ClientDashboardPage({
   searchParams
@@ -35,26 +38,46 @@ export default async function ClientDashboardPage({
 
   const portfolio = client.portfolios[0];
   const portfolioCurrency = (portfolio.baseCurrency ?? client.baseCurrency ?? "ARS").toUpperCase();
+  const latestFx = await getLatestUsdArsRate();
+  const fxRates = buildFxRateMap(latestFx?.rate);
+  const latestQuotes = await getLatestAssetQuotes(portfolio.holdings.map((holding) => holding.assetId));
+  const holdingsWithLivePricing = portfolio.holdings.map((holding) => {
+    const quote = latestQuotes.get(holding.assetId);
+    const livePrice = quote?.price ?? Number(holding.price ?? 0);
+    const quantity = Number(holding.quantity ?? 0);
+    const averageCost = Number(holding.averageCost ?? 0);
+    const liveMarketValue = quantity * livePrice;
+    const liveUnrealizedPnl = quantity * (livePrice - averageCost);
+
+    return {
+      ...holding,
+      livePrice,
+      liveMarketValue,
+      liveUnrealizedPnl,
+      liveQuoteAsOf: quote?.asOf ?? holding.valuationDate ?? null,
+      liveChangePct: quote?.changePct
+    };
+  });
   const totalValue = calculatePortfolioTotalValue(
-    portfolio.holdings.map((holding) => ({
+    holdingsWithLivePricing.map((holding) => ({
       assetClass: holding.asset.assetClass,
-      marketValue: convertCurrency(Number(holding.marketValue), holding.asset.currency ?? portfolioCurrency, selectedCurrency)
+      marketValue: convertCurrency(holding.liveMarketValue, holding.asset.currency ?? portfolioCurrency, selectedCurrency, fxRates)
     }))
   );
-  const totalUnrealizedPnl = portfolio.holdings.reduce(
-    (sum, holding) => sum + convertCurrency(Number(holding.unrealizedPnl ?? 0), holding.asset.currency ?? portfolioCurrency, selectedCurrency),
+  const totalUnrealizedPnl = holdingsWithLivePricing.reduce(
+    (sum, holding) => sum + convertCurrency(holding.liveUnrealizedPnl, holding.asset.currency ?? portfolioCurrency, selectedCurrency, fxRates),
     0
   );
-  const totalCostBasis = portfolio.holdings.reduce(
+  const totalCostBasis = holdingsWithLivePricing.reduce(
     (sum, holding) =>
-      sum + convertCurrency(Number(holding.averageCost ?? 0) * Number(holding.quantity ?? 0), holding.asset.currency ?? portfolioCurrency, selectedCurrency),
+      sum + convertCurrency(Number(holding.averageCost ?? 0) * Number(holding.quantity ?? 0), holding.asset.currency ?? portfolioCurrency, selectedCurrency, fxRates),
     0
   );
   const totalGainPct = calculateGainPercentage(totalValue, totalCostBasis);
   const performanceSeries = buildPerformanceSeries(
     portfolio.snapshots.map((snapshot) => ({
       snapshotDate: snapshot.snapshotDate,
-      totalValue: convertCurrency(Number(snapshot.totalValue), portfolioCurrency, selectedCurrency)
+      totalValue: convertCurrency(Number(snapshot.totalValue), portfolioCurrency, selectedCurrency, fxRates)
     }))
   );
   const latestSnapshot = portfolio.snapshots[portfolio.snapshots.length - 1];
@@ -62,32 +85,32 @@ export default async function ClientDashboardPage({
   const returnValue =
     latestSnapshot && previousSnapshot
       ? calculateSimpleReturn(
-          convertCurrency(Number(latestSnapshot.totalValue), portfolioCurrency, selectedCurrency),
-          convertCurrency(Number(previousSnapshot.totalValue), portfolioCurrency, selectedCurrency)
+          convertCurrency(Number(latestSnapshot.totalValue), portfolioCurrency, selectedCurrency, fxRates),
+          convertCurrency(Number(previousSnapshot.totalValue), portfolioCurrency, selectedCurrency, fxRates)
         )
       : 0.034;
   const averageMonthlyReturn = calculateAveragePeriodicReturn(
-    portfolio.snapshots.map((snapshot) => convertCurrency(Number(snapshot.totalValue), portfolioCurrency, selectedCurrency))
+    portfolio.snapshots.map((snapshot) => convertCurrency(Number(snapshot.totalValue), portfolioCurrency, selectedCurrency, fxRates))
   );
   const projectedAnnualReturn = annualizePeriodicReturn(averageMonthlyReturn || returnValue, 12);
   const projectionScenarios = buildProjectionScenarios(totalValue, projectedAnnualReturn);
-  const assetAllocation = [...portfolio.holdings]
+  const assetAllocation = [...holdingsWithLivePricing]
     .map((holding) => ({
       id: holding.id,
       name: holding.asset.displayName,
       assetClass: holding.asset.assetClass,
-      marketValue: convertCurrency(Number(holding.marketValue), holding.asset.currency ?? portfolioCurrency, selectedCurrency),
-      weight: totalValue > 0 ? convertCurrency(Number(holding.marketValue), holding.asset.currency ?? portfolioCurrency, selectedCurrency) / totalValue : 0
+      marketValue: convertCurrency(holding.liveMarketValue, holding.asset.currency ?? portfolioCurrency, selectedCurrency, fxRates),
+      weight: totalValue > 0 ? convertCurrency(holding.liveMarketValue, holding.asset.currency ?? portfolioCurrency, selectedCurrency, fxRates) / totalValue : 0
     }))
     .sort((left, right) => right.marketValue - left.marketValue);
-  const positions = [...portfolio.holdings]
+  const positions = [...holdingsWithLivePricing]
     .map((holding) => {
       const quantity = Number(holding.quantity ?? 0);
       const holdingCurrency = (holding.asset.currency ?? portfolioCurrency).toUpperCase();
-      const averageCost = convertCurrency(Number(holding.averageCost ?? 0), holdingCurrency, selectedCurrency);
-      const price = convertCurrency(Number(holding.price ?? 0), holdingCurrency, selectedCurrency);
-      const marketValue = convertCurrency(Number(holding.marketValue ?? 0), holdingCurrency, selectedCurrency);
-      const unrealizedPnl = convertCurrency(Number(holding.unrealizedPnl ?? 0), holdingCurrency, selectedCurrency);
+      const averageCost = convertCurrency(Number(holding.averageCost ?? 0), holdingCurrency, selectedCurrency, fxRates);
+      const price = convertCurrency(holding.livePrice, holdingCurrency, selectedCurrency, fxRates);
+      const marketValue = convertCurrency(holding.liveMarketValue, holdingCurrency, selectedCurrency, fxRates);
+      const unrealizedPnl = convertCurrency(holding.liveUnrealizedPnl, holdingCurrency, selectedCurrency, fxRates);
       const weight = totalValue > 0 ? marketValue / totalValue : 0;
       const gainPct = calculateGainPercentage(price, averageCost);
 
@@ -100,7 +123,9 @@ export default async function ClientDashboardPage({
         marketValue,
         unrealizedPnl,
         weight,
-        gainPct
+        gainPct,
+        liveQuoteAsOf: holding.liveQuoteAsOf,
+        liveChangePct: holding.liveChangePct
       };
     })
     .sort((left, right) => right.marketValue - left.marketValue);
@@ -152,6 +177,10 @@ export default async function ClientDashboardPage({
             <div className="rounded-[24px] border border-[#1f4d3a]/10 bg-white/78 px-5 py-4">
               <p className="text-[11px] uppercase tracking-[0.2em] text-[#7c8e85]">Ultima actualizacion</p>
               <p className="mt-2 text-[16px] font-medium text-[#173126]">{portfolio.currentAsOfDate ? format(portfolio.currentAsOfDate, "dd/MM/yyyy") : "-"}</p>
+            </div>
+            <div className="rounded-[24px] border border-[#1f4d3a]/10 bg-white/78 px-5 py-4">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-[#7c8e85]">Mercado</p>
+              <p className="mt-2 text-[16px] font-medium text-[#173126]">{latestFx?.asOf ? format(latestFx.asOf, "dd/MM/yyyy HH:mm") : "Referencia interna"}</p>
             </div>
             <div className="rounded-[24px] border border-[#1f4d3a]/10 bg-white/78 px-5 py-4">
               <p className="text-[11px] uppercase tracking-[0.2em] text-[#7c8e85]">Variacion</p>
