@@ -120,7 +120,7 @@ export default async function ClientDashboardPage({
       />
 
       <section className="mb-6 rounded-[32px] border border-[#1f4d3a]/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(244,239,229,0.94))] px-5 py-6 shadow-[0_20px_60px_rgba(31,77,58,0.05)] sm:px-7 sm:py-7">
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-start">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-[#7c8e85]">Resumen Patrimonial</p>
             <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.05em] text-[#173126] sm:text-[40px]">{formatCurrency(totalValue, selectedCurrency)}</h2>

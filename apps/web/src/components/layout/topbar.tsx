@@ -26,12 +26,13 @@ export function Topbar({
           <p className="mt-1 text-[13px] text-[#6d7f75]">Acceso privado con informacion consolidada</p>
         </div>
         <form
+          className="sm:flex sm:items-center"
           action={async () => {
             "use server";
             await signOut({ redirectTo: "/login" });
           }}
         >
-          <Button className="h-12 px-5" type="submit" variant="secondary">
+          <Button className="h-12 w-full px-5 sm:w-auto sm:min-w-[138px]" type="submit" variant="secondary">
             Cerrar sesion
           </Button>
         </form>
