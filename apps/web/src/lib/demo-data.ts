@@ -218,6 +218,14 @@ export const demoAdminLists = {
 
 export function isPrismaUnavailable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
 
-  return message.includes("Can't reach database server") || message.includes("Environment variable not found: DATABASE_URL");
+  return (
+    normalized.includes("can't reach database server") ||
+    normalized.includes("environment variable not found: database_url") ||
+    normalized.includes("prismaclientinitializationerror") ||
+    normalized.includes("user was denied access on the database") ||
+    normalized.includes("authentication failed") ||
+    normalized.includes("access denied")
+  );
 }
