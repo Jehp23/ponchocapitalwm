@@ -1,0 +1,22 @@
+{
+  "name": "ponchocapital-wealth-portal",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace web",
+    "dev:web": "npm run dev --workspace web",
+    "dev:api": "npm run dev --workspace api",
+    "build": "npm run build --workspace web && npm run build --workspace api",
+    "lint": "npm run lint --workspace web && npm run lint --workspace api",
+    "typecheck": "npm run typecheck --workspace web && npm run typecheck --workspace api",
+    "db:generate": "npm run db:generate --workspace api",
+    "db:push": "npm run db:push --workspace api",
+    "db:migrate": "npm run db:migrate --workspace api",
+    "db:seed": "npm run db:seed --workspace api",
+    "db:setup": "npm run db:push && npm run db:seed"
+  }
+}

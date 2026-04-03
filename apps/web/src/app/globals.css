@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f6f2e8;
+  --bg-elevated: rgba(255, 252, 246, 0.92);
+  --bg-muted: rgba(239, 233, 220, 0.86);
+  --border: rgba(31, 77, 58, 0.14);
+  --border-strong: rgba(31, 77, 58, 0.28);
+  --text: #183328;
+  --text-soft: #476457;
+  --text-muted: #6d7f75;
+  --accent: #1f4d3a;
+  --accent-soft: rgba(31, 77, 58, 0.08);
+  --success: #3d7a60;
+  --danger: #c96c5e;
+  --shadow: 0 24px 80px rgba(49, 61, 54, 0.1);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(31, 77, 58, 0.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(209, 186, 146, 0.2), transparent 26%),
+    linear-gradient(180deg, #fbf8f2 0%, #f6f2e8 52%, #efe9dd 100%);
+  color: var(--text);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(248, 244, 236, 0.88));
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow);
+}
+
+.grid-sheen {
+  position: relative;
+}
+
+.grid-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(31, 77, 58, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 77, 58, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 92%);
+}

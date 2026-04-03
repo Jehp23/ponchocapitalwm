@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  ADVISOR
+  CLIENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum AssetClass {
+  EQUITY
+  BOND
+  FUND
+  ETF
+  CASH
+  ALTERNATIVE
+  OTHER
+}
+
+enum PortfolioVisibilityStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum UpdateOrigin {
+  IMPORT
+  MANUAL
+}
+
+enum ImportBatchStatus {
+  PENDING
+  PROCESSING
+  PARTIAL_SUCCESS
+  SUCCESS
+  FAILED
+}
+
+enum ImportRowStatus {
+  PROCESSED
+  WARNING
+  ERROR
+  SKIPPED
+}
+
+enum ManualUpdateType {
+  INITIAL_LOAD
+  POSITION_UPSERT
+  POSITION_REMOVE
+  PRICE_ADJUSTMENT
+  COMMENT_ONLY
+}
+
+enum MovementType {
+  BUY
+  SELL
+  DIVIDEND
+  FEE
+  ADJUSTMENT
+}
+
+enum NoteVisibility {
+  INTERNAL
+  CLIENT_VISIBLE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  IMPORT
+  PUBLISH
+}
+
+model User {
+  id             String      @id @default(cuid())
+  email          String      @unique
+  name           String
+  passwordHash   String
+  role           UserRole
+  status         UserStatus  @default(ACTIVE)
+  client         Client?
+  advisedClients Client[]    @relation("AdvisorClients")
+  notes          AdvisorNote[]
+  auditLogs      AuditLog[]
+  importBatches  ImportBatch[]
+  snapshots      PortfolioSnapshot[] @relation("PublishedByUser")
+  manualUpdates  ManualUpdate[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Client {
+  id                String            @id @default(cuid())
+  code              String            @unique
+  displayName       String
+  legalName         String?
+  email             String?
+  baseCurrency      String            @default("USD")
+  advisorId         String?
+  userId            String?           @unique
+  portalEnabled     Boolean           @default(true)
+  lastPublishedAt   DateTime?
+  advisorComment    String?
+  user              User?             @relation(fields: [userId], references: [id])
+  advisor           User?             @relation("AdvisorClients", fields: [advisorId], references: [id])
+  portfolios        Portfolio[]
+  importBatches     ImportBatch[]
+  notes             AdvisorNote[]
+  auditLogs         AuditLog[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model Portfolio {
+  id                     String              @id @default(cuid())
+  clientId               String
+  code                   String              @unique
+  name                   String
+  baseCurrency           String              @default("USD")
+  visibilityStatus       PortfolioVisibilityStatus @default(DRAFT)
+  currentAsOfDate        DateTime?
+  lastPublishedSnapshotId String?
+  client                 Client              @relation(fields: [clientId], references: [id])
+  holdings               PortfolioHolding[]
+  snapshots              PortfolioSnapshot[]
+  importBatches          ImportBatch[]
+  manualUpdates          ManualUpdate[]
+  notes                  AdvisorNote[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+}
+
+model Asset {
+  id             String            @id @default(cuid())
+  normalizedName String
+  displayName    String
+  ticker         String?
+  isin           String?
+  currency       String            @default("USD")
+  assetClass     AssetClass        @default(OTHER)
+  aliases        String[]
+  holdings       PortfolioHolding[]
+  snapshots      PositionSnapshot[]
+  manualUpdates  ManualUpdate[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([normalizedName, currency])
+}
+
+model PortfolioHolding {
+  id                 String       @id @default(cuid())
+  portfolioId        String
+  assetId            String
+  quantity           Decimal      @db.Decimal(22, 8)
+  averageCost        Decimal?     @db.Decimal(18, 6)
+  price              Decimal?     @db.Decimal(18, 6)
+  marketValue        Decimal      @db.Decimal(18, 6)
+  unrealizedPnl      Decimal?     @db.Decimal(18, 6)
+  valuationDate      DateTime?
+  updateOrigin       UpdateOrigin
+  lastImportBatchId  String?
+  lastManualUpdateId String?
+  notes              String?
+  portfolio          Portfolio    @relation(fields: [portfolioId], references: [id])
+  asset              Asset        @relation(fields: [assetId], references: [id])
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([portfolioId, assetId])
+}
+
+model PortfolioSnapshot {
+  id               String         @id @default(cuid())
+  portfolioId      String
+  snapshotDate     DateTime
+  totalValue       Decimal        @db.Decimal(18, 6)
+  publishedAt      DateTime?
+  publishedById    String?
+  sourceLabel      String
+  basedOnImportId  String?
+  summary          Json?
+  portfolio        Portfolio      @relation(fields: [portfolioId], references: [id])
+  publishedBy      User?          @relation("PublishedByUser", fields: [publishedById], references: [id])
+  basedOnImport    ImportBatch?   @relation(fields: [basedOnImportId], references: [id])
+  positions        PositionSnapshot[]
+  createdAt        DateTime       @default(now())
+
+  @@index([portfolioId, snapshotDate])
+}
+
+model PositionSnapshot {
+  id            String            @id @default(cuid())
+  snapshotId    String
+  assetId       String
+  quantity      Decimal           @db.Decimal(22, 8)
+  price         Decimal?          @db.Decimal(18, 6)
+  marketValue   Decimal           @db.Decimal(18, 6)
+  weight        Decimal?          @db.Decimal(8, 6)
+  sourceOrigin  UpdateOrigin
+  snapshot      PortfolioSnapshot @relation(fields: [snapshotId], references: [id])
+  asset         Asset             @relation(fields: [assetId], references: [id])
+
+  @@unique([snapshotId, assetId])
+}
+
+model ImportBatch {
+  id             String            @id @default(cuid())
+  clientId       String
+  portfolioId    String
+  uploadedById   String
+  fileName       String
+  status         ImportBatchStatus @default(PENDING)
+  valuationDate  DateTime
+  columnMapping  Json?
+  processedRows  Int               @default(0)
+  errorRows      Int               @default(0)
+  summary        Json?
+  client         Client            @relation(fields: [clientId], references: [id])
+  portfolio      Portfolio         @relation(fields: [portfolioId], references: [id])
+  uploadedBy     User              @relation(fields: [uploadedById], references: [id])
+  rows           ImportRow[]
+  snapshots      PortfolioSnapshot[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model ImportRow {
+  id          String          @id @default(cuid())
+  batchId     String
+  rowNumber   Int
+  rawPayload  Json
+  normalized  Json?
+  status      ImportRowStatus
+  errors      String[]
+  warnings    String[]
+  batch       ImportBatch     @relation(fields: [batchId], references: [id])
+  createdAt   DateTime        @default(now())
+
+  @@unique([batchId, rowNumber])
+}
+
+model ManualUpdate {
+  id             String           @id @default(cuid())
+  portfolioId    String
+  createdById    String
+  assetId        String?
+  updateType     ManualUpdateType
+  movementType   MovementType     @default(ADJUSTMENT)
+  effectiveDate  DateTime
+  tradeDate      DateTime?
+  settlementDate DateTime?
+  quantity       Decimal?         @db.Decimal(22, 8)
+  price          Decimal?         @db.Decimal(18, 6)
+  grossAmount    Decimal?         @db.Decimal(18, 6)
+  title          String
+  description    String?
+  payload        Json?
+  visibleToClient Boolean         @default(false)
+  portfolio      Portfolio        @relation(fields: [portfolioId], references: [id])
+  createdBy      User             @relation(fields: [createdById], references: [id])
+  asset          Asset?           @relation(fields: [assetId], references: [id])
+  createdAt      DateTime         @default(now())
+}
+
+model AdvisorNote {
+  id            String         @id @default(cuid())
+  clientId      String
+  portfolioId   String?
+  authorId      String
+  title         String
+  body          String
+  visibility    NoteVisibility @default(CLIENT_VISIBLE)
+  publishedAt   DateTime?
+  client        Client         @relation(fields: [clientId], references: [id])
+  portfolio     Portfolio?     @relation(fields: [portfolioId], references: [id])
+  author        User           @relation(fields: [authorId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  actorUserId String?
+  clientId    String?
+  action      AuditAction
+  entityType  String
+  entityId    String
+  metadata    Json?
+  actor       User?       @relation(fields: [actorUserId], references: [id])
+  client      Client?     @relation(fields: [clientId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([entityType, entityId, createdAt])
+}
